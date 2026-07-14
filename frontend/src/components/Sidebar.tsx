@@ -14,7 +14,6 @@ const NAV_ITEMS: NavItem[] = [
   { icon: 'psychology',label: 'Models',       to: '/models'      },
   { icon: 'hub',       label: 'Vector Store', to: '/vector-store'},
   { icon: 'terminal',  label: 'Logs',         to: '/logs'        },
-  { icon: 'key',       label: 'API Keys',     to: '/api-keys'    },
   { icon: 'settings',  label: 'Settings',     to: '/settings'    },
 ];
 

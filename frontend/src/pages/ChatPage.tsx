@@ -1,20 +1,50 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { chatService } from '@/services/chat.service';
 import { ChatInput } from '@/components/ChatInput';
 import { ChatMessage } from '@/components/ChatMessage';
 import { RepositoryCard } from '@/components/RepositoryCard';
 import { TypingIndicator } from '@/components/ui/TypingIndicator';
 import { repositoryService } from '@/services/repository.service';
-import type { Message } from '@/types';
+import type { Message, ChatSession } from '@/types';
+import { saveSession } from '@/types';
 
 // ── Suggestion chips shown in the empty state ──────────────────────────────
 const SUGGESTIONS = [
-  { icon: 'lock',         color: 'bg-blue-100 text-blue-600',   text: 'How does JWT authentication work?' },
-  { icon: 'layers',       color: 'bg-purple-100 text-purple-600', text: 'Explain project architecture' },
-  { icon: 'person',       color: 'bg-orange-100 text-orange-600', text: 'Find all API endpoints' },
-  { icon: 'code',         color: 'bg-green-100 text-green green-600', text: 'Optimize database queries' },
-  { icon: 'search',       color: 'bg-cyan-100 text-cyan-600',   text: 'Search for TODO comments' },
-  { icon: 'auto_awesome', color: 'bg-pink-100 text-pink-600',   text: 'Suggest code improvements' },
+  {
+    icon: 'account_tree',
+    color: 'bg-blue-100 text-blue-600',
+    text: 'Give me an overview of this project\'s architecture and main components',
+  },
+  {
+    icon: 'api',
+    color: 'bg-purple-100 text-purple-600',
+    text: 'List all the API endpoints defined in this repository',
+  },
+  {
+    icon: 'bug_report',
+    color: 'bg-red-100 text-red-600',
+    text: 'Are there any TODO, FIXME or HACK comments in the codebase?',
+  },
+  {
+    icon: 'schema',
+    color: 'bg-green-100 text-green-600',
+    text: 'What database models or schemas are defined in this project?',
+  },
+  {
+    icon: 'lock',
+    color: 'bg-orange-100 text-orange-600',
+    text: 'How is authentication and authorisation handled in this codebase?',
+  },
+  {
+    icon: 'settings',
+    color: 'bg-cyan-100 text-cyan-600',
+    text: 'What environment variables or configuration values does this project need?',
+  },
+  {
+    icon: 'integration_instructions',
+    color: 'bg-pink-100 text-pink-600',
+    text: 'How do the different modules or services communicate with each other?',
+  },
 ];
 
 export function ChatPage() {
@@ -22,6 +52,9 @@ export function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState('');
+
+  // ── active session id for history persistence ──────────────────────────
+  const sessionIdRef = useRef<string | null>(null);
 
   // ── repository panel state ─────────────────────────────────────────────
   const [repoPath, setRepoPath] = useState('');
@@ -35,13 +68,21 @@ export function ChatPage() {
     setChatError('');
     setChatLoading(true);
 
+    const now = new Date().toISOString();
+
+    // Create a new session id on the first message of the conversation
+    if (!sessionIdRef.current) {
+      sessionIdRef.current = crypto.randomUUID();
+    }
+
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: 'user',
       content: question,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
     };
-    setMessages((prev) => [...prev, userMsg]);
+    const updatedWithUser = [...messages, userMsg];
+    setMessages(updatedWithUser);
 
     try {
       const response = await chatService.sendMessage({ question });
@@ -51,7 +92,18 @@ export function ChatPage() {
         content: response.answer,
         createdAt: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, assistantMsg]);
+      const finalMessages = [...updatedWithUser, assistantMsg];
+      setMessages(finalMessages);
+
+      // Persist the updated session to localStorage
+      const session: ChatSession = {
+        id: sessionIdRef.current,
+        title: question.slice(0, 60) + (question.length > 60 ? '…' : ''),
+        messages: finalMessages,
+        createdAt: now,
+        updatedAt: new Date().toISOString(),
+      };
+      saveSession(session);
     } catch {
       setChatError('Unable to reach the chat backend. Please try again.');
     } finally {
@@ -65,6 +117,8 @@ export function ChatPage() {
   const handleClearChat = () => {
     setMessages([]);
     setChatError('');
+    // Reset session so the next message starts a brand-new history entry
+    sessionIdRef.current = null;
   };
 
   const handleIndexRepo = async () => {

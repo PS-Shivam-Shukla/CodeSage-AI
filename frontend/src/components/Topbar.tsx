@@ -22,9 +22,6 @@ export function Topbar() {
         <NavLink to="/models" className={navLinkClass}>
           Models
         </NavLink>
-        <NavLink to="/api-keys" className={navLinkClass}>
-          API Keys
-        </NavLink>
       </nav>
 
       {/* Right: actions */}
