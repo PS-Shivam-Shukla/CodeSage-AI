@@ -1,1 +1,3 @@
-from .rag_pipeline import RAGPipeline
+from .rag_pipeline import RAGPipeline, RAGResult
+
+__all__ = ["RAGPipeline", "RAGResult"]
