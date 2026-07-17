@@ -34,7 +34,19 @@ IGNORED_DIRECTORIES = {
     ".vscode",
     "__pycache__",
     ".venv",
+    ".venv_backend",  # Backend virtual environment
     "venv",
+    ".pytest_cache",  # Pytest cache
+    ".mypy_cache",    # MyPy cache
+    "chroma_db",      # Don't index the vector database itself
+    "evaluation_reports",  # Don't index evaluation reports
+    ".hypothesis",    # Hypothesis testing cache
+    "htmlcov",        # Coverage HTML reports
+    ".tox",           # Tox environments
+    "wheels",         # Python wheels
+    "eggs",           # Python eggs
+    ".eggs",          # Egg info
+    "*.egg-info",     # Egg metadata
 }
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB

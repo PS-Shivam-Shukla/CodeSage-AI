@@ -15,8 +15,8 @@ Architecture
             ▼
     EvaluationService.evaluate(rag_result)
             │
-            ├── RagasAdapter.run()          ← 5 RAGAS quality metrics
-            │       └── ragas.evaluate()    ← NVIDIA LLM + bge-m3 as judges
+            ├── EvaluationAdapter.run()     ← 5 quality metrics
+            │       └── manual evaluation   ← NVIDIA LLM + bge-m3 as judges
             │
             ├── ReasoningEvaluator.evaluate()  ← LLM-as-a-Judge rubric
             │
@@ -28,12 +28,12 @@ Architecture
 
 Design decisions
 ----------------
-1. Lazy initialisation: RagasAdapter and ReasoningEvaluator are only
+1. Lazy initialisation: EvaluationAdapter and ReasoningEvaluator are only
    instantiated when evaluate() is first called, not at import time.
    This means importing the module never triggers LLM or model loading.
 
-2. Independent metric failures: If RAGAS fails, ReasoningEvaluator still
-   runs. If ReasoningEvaluator fails, RAGAS scores are still returned.
+2. Independent metric failures: If evaluation adapter fails, ReasoningEvaluator still
+   runs. If ReasoningEvaluator fails, evaluation scores are still returned.
    Each component fails in isolation; the EvaluationResult is always
    returned with whatever scores could be computed.
 
@@ -61,7 +61,7 @@ from app.evaluation.models import (
     EvaluationResult,
     MetricScore,
 )
-from app.evaluation.ragas_adapter import RagasAdapter
+from app.evaluation.evaluation_adapter import EvaluationAdapter
 from app.evaluation.reasoning_evaluator import ReasoningEvaluator
 
 logger = logging.getLogger(__name__)
@@ -113,11 +113,11 @@ class EvaluationService:
         """
         Initialise the EvaluationService.
 
-        Component instances (RagasAdapter, ReasoningEvaluator) are
+        Component instances (EvaluationAdapter, ReasoningEvaluator) are
         created lazily on the first evaluate() call to avoid loading
         models at import time.
         """
-        self._ragas:     Optional[RagasAdapter]       = None
+        self._evaluation_adapter: Optional[EvaluationAdapter] = None
         self._reasoner:  Optional[ReasoningEvaluator] = None
 
     # -----------------------------------------------------------------------
@@ -217,8 +217,8 @@ class EvaluationService:
 
         Steps
         -----
-        1. Lazily initialise RagasAdapter and ReasoningEvaluator.
-        2. Run RAGAS (5 metrics) — catches and logs any failure.
+        1. Lazily initialise EvaluationAdapter and ReasoningEvaluator.
+        2. Run evaluation adapter (5 metrics) — catches and logs any failure.
         3. Run ReasoningEvaluator — catches and logs any failure.
         4. Derive hallucination_rate from faithfulness score.
         5. Wrap each raw score in a MetricScore (score + label).
@@ -235,8 +235,8 @@ class EvaluationService:
         # ── Step 1: lazy init ────────────────────────────────────────────────
         self._ensure_components_initialised()
 
-        # ── Step 2: RAGAS metrics ────────────────────────────────────────────
-        ragas_scores = self._run_ragas_safely(
+        # ── Step 2: evaluation metrics ──────────────────────────────────────────
+        evaluation_scores = self._run_evaluation_adapter_safely(
             question=question,
             answer=answer,
             contexts=contexts,
@@ -251,7 +251,7 @@ class EvaluationService:
         )
 
         # ── Step 4: derive hallucination rate ────────────────────────────────
-        faithfulness_score = ragas_scores.get("faithfulness")
+        faithfulness_score = evaluation_scores.get("faithfulness")
         hallucination_score = (
             round(1.0 - faithfulness_score, SCORE_DECIMAL_PLACES)
             if faithfulness_score is not None
@@ -261,13 +261,13 @@ class EvaluationService:
         # ── Step 5: build MetricScore objects ────────────────────────────────
         context_precision = MetricScore(
             name  = "Context Precision",
-            score = ragas_scores.get("context_precision"),
-            label = label_from_score(ragas_scores.get("context_precision")),
+            score = evaluation_scores.get("context_precision"),
+            label = label_from_score(evaluation_scores.get("context_precision")),
         )
         context_recall = MetricScore(
             name  = "Context Recall",
-            score = ragas_scores.get("context_recall"),
-            label = label_from_score(ragas_scores.get("context_recall")),
+            score = evaluation_scores.get("context_recall"),
+            label = label_from_score(evaluation_scores.get("context_recall")),
         )
         faithfulness = MetricScore(
             name  = "Faithfulness",
@@ -276,13 +276,13 @@ class EvaluationService:
         )
         answer_relevancy = MetricScore(
             name  = "Answer Relevancy",
-            score = ragas_scores.get("answer_relevancy"),
-            label = label_from_score(ragas_scores.get("answer_relevancy")),
+            score = evaluation_scores.get("answer_relevancy"),
+            label = label_from_score(evaluation_scores.get("answer_relevancy")),
         )
         answer_correctness = MetricScore(
             name  = "Answer Correctness",
-            score = ragas_scores.get("answer_correctness"),
-            label = label_from_score(ragas_scores.get("answer_correctness")),
+            score = evaluation_scores.get("answer_correctness"),
+            label = label_from_score(evaluation_scores.get("answer_correctness")),
         )
         hallucination_rate = MetricScore(
             name  = "Hallucination Rate",
@@ -294,11 +294,11 @@ class EvaluationService:
 
         # ── Step 6: weighted average ─────────────────────────────────────────
         average_score = self._compute_weighted_average(
-            precision   = ragas_scores.get("context_precision"),
-            recall      = ragas_scores.get("context_recall"),
+            precision   = evaluation_scores.get("context_precision"),
+            recall      = evaluation_scores.get("context_recall"),
             faithfulness_val = faithfulness_score,
-            relevancy   = ragas_scores.get("answer_relevancy"),
-            correctness = ragas_scores.get("answer_correctness"),
+            relevancy   = evaluation_scores.get("answer_relevancy"),
+            correctness = evaluation_scores.get("answer_correctness"),
             reasoning   = reasoning_metric.score,
         )
 
@@ -333,7 +333,7 @@ class EvaluationService:
     # Component runners with individual error isolation
     # -----------------------------------------------------------------------
 
-    def _run_ragas_safely(
+    def _run_evaluation_adapter_safely(
         self,
         question:     str,
         answer:       str,
@@ -341,7 +341,7 @@ class EvaluationService:
         ground_truth: Optional[str],
     ) -> dict[str, Optional[float]]:
         """
-        Run RagasAdapter.run() and return scores dict.
+        Run EvaluationAdapter.run() and return scores dict.
 
         Returns all-None dict on any failure so the rest of the
         evaluation can continue.
@@ -354,14 +354,14 @@ class EvaluationService:
             "answer_correctness": None,
         }
         try:
-            return self._ragas.run(  # type: ignore[union-attr]
+            return self._evaluation_adapter.run(  # type: ignore[union-attr]
                 question     = question,
                 answer       = answer,
                 contexts     = contexts,
                 ground_truth = ground_truth,
             )
         except Exception as exc:
-            logger.error("RAGAS evaluation failed: %s", exc)
+            logger.error("Evaluation adapter failed: %s", exc)
             return empty
 
     def _run_reasoning_safely(
@@ -396,16 +396,16 @@ class EvaluationService:
 
     def _ensure_components_initialised(self) -> None:
         """
-        Initialise RagasAdapter and ReasoningEvaluator on first call.
+        Initialise EvaluationAdapter and ReasoningEvaluator on first call.
 
         Lazy init means importing EvaluationService never loads the LLM
         or embedding model — only the first evaluate() call triggers that.
         This keeps startup time fast and avoids loading models in tests
         that mock these components.
         """
-        if self._ragas is None:
-            logger.info("Initialising RagasAdapter...")
-            self._ragas = RagasAdapter()
+        if self._evaluation_adapter is None:
+            logger.info("Initialising EvaluationAdapter...")
+            self._evaluation_adapter = EvaluationAdapter()
 
         if self._reasoner is None:
             logger.info("Initialising ReasoningEvaluator...")

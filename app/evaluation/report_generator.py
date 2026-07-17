@@ -25,7 +25,11 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _utcnow() -> datetime:
+    """Return current UTC time — Python 3.11+ compatible."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 from pathlib import Path
 from typing import Optional
 
@@ -192,7 +196,7 @@ class ReportGenerator:
         )
 
         payload = {
-            "generated_at":    datetime.utcnow().isoformat(),
+            "generated_at":    _utcnow().isoformat(),
             "total_evaluated": len(results),
             "batch_average":   batch_avg,
             "results":         [r.to_dict() for r in results],
@@ -267,7 +271,7 @@ class ReportGenerator:
         sections: list[str] = [
             "# Batch Evaluation Report",
             "",
-            f"**Generated:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}  ",
+            f"**Generated:** {_utcnow().strftime('%Y-%m-%d %H:%M UTC')}  ",
             f"**Total Evaluated:** {len(results)}  ",
             f"**Batch Average Score:** "
             f"{batch_avg if batch_avg is not None else 'N/A'}",
@@ -395,9 +399,8 @@ class ReportGenerator:
         lines.append("")
         if result.repository_name:
             lines.append(f"**Repository:** {result.repository_name}  ")
-        lines.append(
-            f"**Evaluated:** "
-            f"{result.evaluated_at.strftime('%Y-%m-%d %H:%M UTC')}  "
+        lines.append(f"**Evaluated:** "
+            f"{_utcnow().strftime('%Y-%m-%d %H:%M UTC')}  "
         )
         lines.append(f"**Question:** {result.question}")
         lines.append("")

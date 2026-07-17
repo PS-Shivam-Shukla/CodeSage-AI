@@ -1,159 +1,226 @@
 # Contributing to CodeSage AI
 
-Thank you for your interest in contributing. This document covers everything you need to get started.
+Thank you for your interest in contributing to CodeSage AI! This document provides guidelines for contributing to the project.
 
----
+## 🚀 Getting Started
 
-## Table of Contents
-
-- [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [Development Setup](#development-setup)
-- [Branch Naming](#branch-naming)
-- [Commit Messages](#commit-messages)
-- [Pull Request Process](#pull-request-process)
-- [Code Style](#code-style)
-- [Reporting Bugs](#reporting-bugs)
-- [Suggesting Features](#suggesting-features)
-
----
-
-## Code of Conduct
-
-Be respectful and constructive. Harassment of any kind will not be tolerated.
-
----
-
-## Getting Started
-
-1. Fork the repository on GitHub
-2. Clone your fork locally:
+1. **Fork the repository** on GitHub
+2. **Clone your fork** locally:
    ```bash
-   git clone https://github.com/<your-username>/CodeSage-AI.git
+   git clone https://github.com/your-username/CodeSage-AI.git
    cd CodeSage-AI
    ```
-3. Add the upstream remote:
+3. **Set up development environment**:
    ```bash
-   git remote add upstream https://github.com/PS-Shivam-Shukla/CodeSage-AI.git
+   python -m venv .venv_backend
+   .\.venv_backend\Scripts\Activate.ps1
+   pip install -r requirements.txt
    ```
 
----
+## 📝 Development Workflow
 
-## Development Setup
+### 1. Create a Feature Branch
 
-### Backend
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+```bash
+git checkout -b feature/your-feature-name
 ```
 
-Create a `.env` file in the root with your `NVIDIA_API_KEY`.
+Branch naming conventions:
+- `feature/` - New features
+- `fix/` - Bug fixes
+- `docs/` - Documentation updates
+- `perf/` - Performance improvements
+- `refactor/` - Code refactoring
 
-Start the backend:
+### 2. Make Your Changes
 
-```powershell
-uvicorn main:app --reload --port 8000
+- Write clear, commented code
+- Follow existing code style and patterns
+- Add tests for new functionality
+- Update documentation as needed
+
+### 3. Test Your Changes
+
+```bash
+# Run tests
+pytest tests/
+
+# Quick validation
+python quick_test.py
+
+# Full evaluation
+python run_evaluation.py
 ```
 
-### Frontend
+### 4. Commit Your Changes
 
-```powershell
-cd frontend
-npm install
-npm run dev
+Use clear, descriptive commit messages:
+
+```bash
+git commit -m "Add query expansion for API-related terms"
+git commit -m "Fix: Handle empty context in retrieval service"
+git commit -m "Docs: Update README with new configuration options"
 ```
 
----
+### 5. Push and Create Pull Request
 
-## Branch Naming
-
-Use the following prefixes:
-
-| Prefix | Purpose |
-|---|---|
-| `feat/` | New features |
-| `fix/` | Bug fixes |
-| `docs/` | Documentation changes |
-| `refactor/` | Code refactoring without behaviour change |
-| `chore/` | Build system, dependency updates |
-| `test/` | Adding or improving tests |
-
-Example: `feat/streaming-responses`
-
----
-
-## Commit Messages
-
-Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
-
-```
-<type>(optional scope): <short summary>
+```bash
+git push origin feature/your-feature-name
 ```
 
-Examples:
+Then create a Pull Request on GitHub with:
+- Clear description of changes
+- Any related issue numbers
+- Screenshots (if UI changes)
+- Test results
 
+## 🧪 Testing Guidelines
+
+### Unit Tests
+
+```python
+# tests/test_retrieval.py
+def test_query_expansion():
+    expander = QueryExpander()
+    queries = expander.expand_query("What is API?")
+    assert len(queries) > 1
+    assert any("endpoint" in q.lower() for q in queries)
 ```
-feat(api): add streaming support to /chat endpoint
-fix(indexing): handle empty repository path gracefully
-docs: update API documentation for /index/status
-chore(deps): upgrade langchain to latest
+
+### Integration Tests
+
+```python
+# tests/test_pipeline.py
+def test_rag_pipeline_with_expansion():
+    pipeline = RAGPipeline()
+    result = pipeline.ask_with_context("How does auth work?", k=10)
+    assert len(result.contexts) == 10
+    assert result.answer is not None
 ```
 
----
-
-## Pull Request Process
-
-1. Sync your fork with upstream before starting work:
-   ```bash
-   git fetch upstream
-   git rebase upstream/main
-   ```
-2. Create a new branch from `main`
-3. Make your changes — keep commits atomic and focused
-4. Ensure the backend starts without errors: `uvicorn main:app --reload`
-5. Ensure the frontend builds without errors: `npm run build` (inside `frontend/`)
-6. Open a PR against `main` with a clear description of what changed and why
-7. Link any related issues in the PR description
-
----
-
-## Code Style
+## 📐 Code Style
 
 ### Python
 
-- Follow [PEP 8](https://peps.python.org/pep-0008/)
-- Use type hints on all function signatures
-- Write docstrings for all public classes and methods
-- Keep modules focused — one responsibility per file
-- Use `lru_cache` or similar patterns to avoid re-loading heavy resources (e.g. embedding models)
+- Follow [PEP 8](https://pep8.org/)
+- Use type hints where possible
+- Maximum line length: 100 characters
+- Use docstrings for all public functions/classes
 
-### TypeScript / React
+Example:
 
-- Prefer functional components and hooks
-- Keep components small and single-purpose
-- Use `const` over `let` where possible
-- Name files with PascalCase for components, camelCase for utilities and services
+```python
+def expand_query(query: str, use_acronyms: bool = True) -> List[str]:
+    """
+    Expand user query into multiple variations.
+    
+    Args:
+        query: Original user question
+        use_acronyms: Whether to expand acronyms
+        
+    Returns:
+        List of query variations
+    """
+    pass
+```
 
----
+### TypeScript (Frontend)
 
-## Reporting Bugs
+- Use TypeScript strict mode
+- Follow React best practices
+- Use functional components with hooks
+- Maximum line length: 100 characters
 
-Open an issue on GitHub with the following information:
+## 🏗️ Architecture Guidelines
 
-- OS and Python/Node.js version
-- Steps to reproduce
-- Expected behaviour
-- Actual behaviour
-- Any relevant error logs or screenshots
+### Adding New Features
 
----
+1. **Retrieval Enhancement**:
+   - Add to `app/retriever/`
+   - Update `RetrievalService` class
+   - Add tests in `tests/test_retrieval.py`
 
-## Suggesting Features
+2. **Evaluation Metrics**:
+   - Add to `app/evaluation/`
+   - Integrate with `EvaluationService`
+   - Document in evaluation config
 
-Open an issue with the label `enhancement`. Describe:
+3. **API Endpoints**:
+   - Add to `app/api/routes.py`
+   - Define schemas in `app/api/schemas.py`
+   - Update API documentation
 
-- The problem you are trying to solve
-- Your proposed solution
-- Any alternatives you considered
+### Performance Considerations
+
+- Use caching where appropriate
+- Implement batch processing for bulk operations
+- Add retry logic for external API calls
+- Consider memory usage for large repositories
+
+## 📊 Evaluation Standards
+
+All changes should maintain or improve:
+- Context Precision (target: >0.40)
+- Context Recall (target: >0.50)
+- Overall Average Score (target: >0.50)
+- Response Time (target: <10s)
+
+Run evaluation before submitting PR:
+
+```bash
+python run_evaluation.py
+```
+
+## 🐛 Bug Reports
+
+When reporting bugs, include:
+- **Description**: Clear description of the issue
+- **Steps to Reproduce**: Exact steps to reproduce the bug
+- **Expected Behavior**: What should happen
+- **Actual Behavior**: What actually happens
+- **Environment**: OS, Python version, dependencies
+- **Logs**: Relevant error messages or logs
+
+## 💡 Feature Requests
+
+When proposing features:
+- **Use Case**: Why is this feature needed?
+- **Proposed Solution**: How should it work?
+- **Alternatives**: What other approaches were considered?
+- **Impact**: How does this affect existing functionality?
+
+## 📚 Documentation
+
+Update documentation when:
+- Adding new features
+- Changing API endpoints
+- Modifying configuration options
+- Improving performance
+
+Documentation locations:
+- `README.md` - Main documentation
+- `CHANGELOG.md` - Version history
+- Code docstrings - Inline documentation
+- `docs/` - Detailed guides (if applicable)
+
+## ⚖️ License
+
+By contributing, you agree that your contributions will be licensed under the MIT License.
+
+## 🤝 Code of Conduct
+
+- Be respectful and inclusive
+- Provide constructive feedback
+- Focus on the issue, not the person
+- Help others learn and grow
+
+## 📞 Questions?
+
+If you have questions:
+- Open an issue on GitHub
+- Check existing issues and discussions
+- Review the README and documentation
+
+## 🙏 Thank You!
+
+Your contributions make CodeSage AI better for everyone. We appreciate your time and effort!

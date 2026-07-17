@@ -24,17 +24,3 @@ huggingface-hub
 pypdf
 
 python-dotenv
-
-ragas==0.3.3
-
-
-
-# ── Evaluation Framework ──────────────────────────────────────────────────
-# ragas 0.3.3 is the latest version that installs cleanly on Python 3.14.
-# Versions 0.3.4+ pull in scikit-network which has no Python 3.14 wheel.
-# Versions 0.2.x import langchain_community.chat_models.vertexai which was
-# removed in langchain-community 0.3+.
-# After install, apply the Vertex AI import guard patch to:
-#   .venv_backend/Lib/site-packages/ragas/llms/base.py
-# (wrap the two Vertex AI imports in try/except ImportError)
-ragas==0.3.3

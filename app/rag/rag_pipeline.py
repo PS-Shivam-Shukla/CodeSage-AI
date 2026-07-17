@@ -74,7 +74,7 @@ class RAGPipeline:
     def ask(
         self,
         question: str,
-        k: int = 5,
+        k: int = 10,
     ) -> str:
         """
         Answer a user question and return the answer string only.
@@ -85,7 +85,7 @@ class RAGPipeline:
 
         Args:
             question: User question.
-            k: Number of retrieved chunks.
+            k: Number of retrieved chunks (default: 10, increased from 5 for better coverage).
 
         Returns:
             Generated answer string.
@@ -106,7 +106,7 @@ class RAGPipeline:
     def ask_with_context(
         self,
         question:        str,
-        k:               int            = 5,
+        k:               int            = 10,
         ground_truth:    Optional[str]  = None,
         repository_name: Optional[str]  = None,
     ) -> RAGResult:
@@ -122,7 +122,8 @@ class RAGPipeline:
 
         Args:
             question:        User question.
-            k:               Number of chunks to retrieve (default 5).
+            k:               Number of chunks to retrieve (default: 10, increased from 5 
+                             for better context coverage and improved retrieval metrics).
             ground_truth:    Expected answer for Answer Correctness metric.
                              Pass ``None`` to skip that metric gracefully.
             repository_name: Human-readable label shown in reports.

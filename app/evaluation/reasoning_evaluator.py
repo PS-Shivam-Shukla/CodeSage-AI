@@ -62,10 +62,12 @@ from app.evaluation.config import (
     EVAL_LLM_MAX_TOKENS,
     EVAL_LLM_MODEL,
     EVAL_LLM_TEMPERATURE,
+    EVAL_LLM_TIMEOUT,
     NVIDIA_API_KEY_ENV_VAR,
     label_from_score,
 )
 from app.evaluation.models import MetricScore
+from app.utils.retry_handler import retry_on_rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -167,8 +169,22 @@ class ReasoningEvaluator:
             model=EVAL_LLM_MODEL,
             temperature=max(EVAL_LLM_TEMPERATURE, 0.2),
             max_tokens=EVAL_LLM_MAX_TOKENS,
+            timeout=EVAL_LLM_TIMEOUT,
         )
         logger.info("ReasoningEvaluator initialised with model: %s", EVAL_LLM_MODEL)
+
+    # -----------------------------------------------------------------------
+    # LLM call with retry logic
+    # -----------------------------------------------------------------------
+
+    @retry_on_rate_limit(max_retries=5, initial_delay=2.0)
+    def _call_llm_with_retry(self, prompt: str):
+        """
+        Call the LLM with automatic retry on rate limits.
+        
+        Retries up to 5 times with exponential backoff on 429 errors.
+        """
+        return self._llm.invoke(prompt)
 
     # -----------------------------------------------------------------------
     # Public interface
@@ -208,7 +224,7 @@ class ReasoningEvaluator:
         )
 
         try:
-            response = self._llm.invoke(prompt)
+            response = self._call_llm_with_retry(prompt)
             raw_text = response.content if hasattr(response, "content") else str(response)
             return self._parse_response(raw_text)
 

@@ -47,7 +47,10 @@ EVAL_LLM_MODEL: str = os.getenv(
     "EVAL_LLM_MODEL", "meta/llama-3.1-70b-instruct"
 )
 EVAL_LLM_TEMPERATURE: float = float(os.getenv("EVAL_LLM_TEMPERATURE", "0.1"))
-EVAL_LLM_MAX_TOKENS:  int   = int(os.getenv("EVAL_LLM_MAX_TOKENS", "1024"))
+# Optimized token usage: reduced from 1024 to 512 for evaluation to minimize API rate limiting
+EVAL_LLM_MAX_TOKENS:  int   = int(os.getenv("EVAL_LLM_MAX_TOKENS", "512"))
+# Timeout for evaluation LLM judge calls (seconds) — longer than default to handle NVIDIA NIM latency
+EVAL_LLM_TIMEOUT:     int   = int(os.getenv("EVAL_LLM_TIMEOUT", "120"))
 
 # NVIDIA API key — read from environment, NEVER hardcoded
 # The .env file sets NVIDIA_API_KEY which ChatNVIDIA picks up automatically.

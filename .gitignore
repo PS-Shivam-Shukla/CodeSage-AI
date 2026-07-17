@@ -341,3 +341,37 @@ frontend/.tsbuildinfo
 .venv/
 .venv_backend/
 venv.bak/
+
+# ============================================================================
+# Production & Deployment
+# ============================================================================
+
+# Evaluation reports (keep directory, ignore reports)
+evaluation_reports/*.json
+evaluation_reports/*.html
+!evaluation_reports/.gitkeep
+
+# Session/temporary documentation
+*SESSION_SUMMARY.md
+*IMPROVEMENTS_SUMMARY.md
+QUICK_START*.md
+ARCHITECTURE_OLD.md
+PROJECT_STRUCTURE*.md
+API_DOCUMENTATION*.md
+ROADMAP*.md
+
+# Production secrets
+*.pem
+*.key
+*.crt
+secrets/
+.secrets/
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Backup files
+*.bak
+*.backup
+*~

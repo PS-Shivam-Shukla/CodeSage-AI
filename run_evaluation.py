@@ -45,7 +45,11 @@ import json
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _utcnow() -> datetime:
+    """Return current UTC time — Python 3.11+ compatible."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 from pathlib import Path
 
 # ── Load .env before any app imports ─────────────────────────────────────────
@@ -75,24 +79,36 @@ from app.rag.rag_pipeline import RAGPipeline
 
 TEST_CASES: list[dict] = [
     {
-        "question":     "Give me an overview of this project's architecture and main components",
-        "ground_truth": None,
+        "question":     "What is CodeSage-AI and what are its main components including the RAG pipeline, evaluation system, and API architecture?",
+        "ground_truth": "CodeSage-AI is a RAG (Retrieval-Augmented Generation) system with FastAPI backend that includes: RAGPipeline for question-answering, EvaluationService with custom metrics adapter, IndexingService for repository processing, embedding service using BAAI/bge-m3, and NVIDIA LLM integration with meta/llama-3.1-70b-instruct model.",
     },
     {
-        "question":     "List all the API endpoints defined in this repository",
-        "ground_truth": None,
+        "question":     "List all the REST API endpoints available in this repository with their HTTP methods and purposes",
+        "ground_truth": "The API endpoints are: POST /chat for question-answering, POST /index for repository indexing, and GET /index/status for checking indexing status and database state.",
     },
     {
-        "question":     "How is authentication and authorisation handled in this codebase?",
-        "ground_truth": None,
+        "question":     "Explain the evaluation metrics system: what metrics are computed and how does the custom evaluation adapter work?",
+        "ground_truth": "The evaluation system computes 5 core metrics using cosine similarity on bge-m3 embeddings: context_precision, context_recall, faithfulness, answer_relevancy, answer_correctness, plus reasoning_quality via LLM-as-judge and derived hallucination_rate. The custom adapter replaced RAGAS dependency for better compatibility.",
     },
     {
-        "question":     "What database models or schemas are defined in this project?",
-        "ground_truth": None,
+        "question":     "What configuration files and environment variables are required to run this project?",
+        "ground_truth": "Required environment variables include NVIDIA_API_KEY for LLM access. Configuration files include app/llm/llm_config.py for model settings, app/evaluation/config.py for evaluation parameters, and .env file for environment variables. The system uses meta/llama-3.1-70b-instruct model with BAAI/bge-m3 embeddings.",
     },
     {
-        "question":     "What environment variables or configuration values does this project need?",
-        "ground_truth": None,
+        "question":     "How does the RAG pipeline work from indexing to retrieval to response generation?",
+        "ground_truth": "The RAG pipeline: 1) IndexingService processes repository files and creates embeddings using BAAI/bge-m3, 2) stores them in Chroma vector database, 3) RAGPipeline retrieves relevant chunks via vector similarity search, 4) passes context to NVIDIA LLM (meta/llama-3.1-70b-instruct) for response generation, 5) EvaluationService measures quality using multiple metrics.",
+    },
+    {
+        "question":     "What are the main Python classes and services implemented in the app directory structure?",
+        "ground_truth": "Main classes include: RAGPipeline (question-answering), EvaluationService (metric computation), IndexingService (repository processing), EmbeddingService (vector generation), EvaluationAdapter (evaluation metrics), ReasoningEvaluator (LLM judge), plus FastAPI route handlers and configuration classes.",
+    },
+    {
+        "question":     "Explain the directory structure and organization of the codebase",
+        "ground_truth": "Directory structure: app/ contains core services (api/, evaluation/, llm/, rag/, embeddings/, indexing/), evaluation_reports/ stores results, .venv_backend/ is Python virtual environment, run_evaluation.py is main evaluation script, and configuration files at root level.",
+    },
+    {
+        "question":     "How does the evaluation system handle errors and what retry mechanisms are in place?",
+        "ground_truth": "The evaluation system includes timeout handling (120s for LLM calls) and graceful error handling where individual metric failures don't stop the entire evaluation. However, it currently lacks retry logic for API rate limiting (429 errors).",
     },
 ]
 
@@ -363,14 +379,14 @@ def save_json_report(
         })
 
     payload = {
-        "generated_at":    datetime.utcnow().isoformat(),
+        "generated_at":    _utcnow().isoformat(),
         "total_evaluated": len(results),
         "batch_average":   batch_avg,
         "overall_grade":   batch_grade,
         "results":         results_list,
     }
 
-    ts   = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    ts   = _utcnow().strftime("%Y%m%d_%H%M%S")
     path = out_dir / f"evaluation_report_{ts}.json"
 
     with open(path, "w", encoding="utf-8") as f:
@@ -434,7 +450,6 @@ Examples:
     except Exception as exc:
         print(f"{RED}ERROR: Could not initialise RAGPipeline: {exc}{RESET}")
         sys.exit(1)
-
     # ── Optional: index a repo first ──────────────────────────────────────────
     if args.repo:
         from app.indexing import IndexingService
@@ -468,11 +483,20 @@ Examples:
             print(f"\n  {DIM}[{i}/{total}] Running: {question[:60]}...{RESET}", flush=True)
 
         try:
-            # ── Step 1: RAG pipeline ─────────────────────────────────────────
-            rag_result = pipeline.ask_with_context(
-                question     = question,
-                ground_truth = ground_truth,
-            )
+            # ── Step 1: RAG pipeline (retry once on timeout) ─────────────────
+            for attempt in range(1, 3):
+                try:
+                    rag_result = pipeline.ask_with_context(
+                        question     = question,
+                        ground_truth = ground_truth,
+                    )
+                    break
+                except Exception as e:
+                    if attempt == 2:
+                        raise
+                    if not args.quiet:
+                        print(f"  {YELLOW}  ↺ Retrying RAG (attempt {attempt} failed: {str(e)[:60]}){RESET}", flush=True)
+                    time.sleep(3)
 
             # ── Step 2: Evaluate ─────────────────────────────────────────────
             eval_result = service.evaluate(rag_result)
@@ -481,6 +505,13 @@ Examples:
             # ── Step 3: Print table for this result ──────────────────────────
             if not args.quiet:
                 print_result_table(eval_result, i, total)
+            
+            # ── Step 4: Rate limit prevention delay ──────────────────────────
+            # Add a small delay between evaluations to avoid hitting rate limits
+            if i < total:  # Don't delay after the last question
+                if not args.quiet:
+                    print(f"  {DIM}  ⏱  Waiting 2s before next evaluation (rate limit prevention)...{RESET}", flush=True)
+                time.sleep(2)
 
         except Exception as exc:
             print(f"\n  {RED}✗ Evaluation failed for question [{i}]: {exc}{RESET}")
