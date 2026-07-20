@@ -52,13 +52,8 @@ EVAL_LLM_MAX_TOKENS:  int   = int(os.getenv("EVAL_LLM_MAX_TOKENS", "512"))
 # Timeout for evaluation LLM judge calls (seconds) — longer than default to handle NVIDIA NIM latency
 EVAL_LLM_TIMEOUT:     int   = int(os.getenv("EVAL_LLM_TIMEOUT", "120"))
 
-# NVIDIA API key — read from environment, NEVER hardcoded
-# The .env file sets NVIDIA_API_KEY which ChatNVIDIA picks up automatically.
-# We document it here for clarity but do NOT read it in this module —
-# langchain_nvidia_ai_endpoints reads it from os.environ directly.
 NVIDIA_API_KEY_ENV_VAR: str = "NVIDIA_API_KEY"
 
-# The HuggingFace embedding model — same as app/config/embedding_config.py
 EVAL_EMBEDDING_MODEL: str = os.getenv(
     "EVAL_EMBEDDING_MODEL", "BAAI/bge-m3"
 )

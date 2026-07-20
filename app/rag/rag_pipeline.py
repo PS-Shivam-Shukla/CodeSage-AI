@@ -74,7 +74,7 @@ class RAGPipeline:
     def ask(
         self,
         question: str,
-        k: int = 10,
+        k: int = 15,
     ) -> str:
         """
         Answer a user question and return the answer string only.
@@ -85,7 +85,8 @@ class RAGPipeline:
 
         Args:
             question: User question.
-            k: Number of retrieved chunks (default: 10, increased from 5 for better coverage).
+            k: Number of retrieved chunks (default: 15, increased from 10 for better 
+               coverage especially for broad repository questions).
 
         Returns:
             Generated answer string.
@@ -106,7 +107,7 @@ class RAGPipeline:
     def ask_with_context(
         self,
         question:        str,
-        k:               int            = 10,
+        k:               int            = 15,
         ground_truth:    Optional[str]  = None,
         repository_name: Optional[str]  = None,
     ) -> RAGResult:
@@ -122,8 +123,8 @@ class RAGPipeline:
 
         Args:
             question:        User question.
-            k:               Number of chunks to retrieve (default: 10, increased from 5 
-                             for better context coverage and improved retrieval metrics).
+            k:               Number of chunks to retrieve (default: 15, increased from 10
+                             for better context coverage, especially for repository-wide questions).
             ground_truth:    Expected answer for Answer Correctness metric.
                              Pass ``None`` to skip that metric gracefully.
             repository_name: Human-readable label shown in reports.
@@ -185,5 +186,20 @@ class RAGPipeline:
         """
         Convert retrieved documents into a single context string
         suitable for injection into the LLM prompt.
+        
+        Includes source file information to help LLM ground its answers.
         """
-        return "\n\n".join(doc.page_content for doc in documents)
+        context_parts = []
+        for doc in documents:
+            source = doc.metadata.get("source", "unknown")
+            chunk_label = doc.metadata.get("chunk_label", "")
+            
+            # Format: [filename.py (chunk 3/8)]
+            header = f"[{source}"
+            if chunk_label:
+                header += f" (chunk {chunk_label})"
+            header += "]"
+            
+            context_parts.append(f"{header}\n{doc.page_content}")
+        
+        return "\n\n---\n\n".join(context_parts)
